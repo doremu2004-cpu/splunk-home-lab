@@ -1,0 +1,33 @@
+version: "3.8"
+
+# Splunk Home Lab - single instance Splunk Enterprise (free dev license)
+# Web UI: http://localhost:8000
+# Splunkd (mgmt API): https://localhost:8089
+#
+# IMPORTANT: change SPLUNK_PASSWORD before using this anywhere but your own
+# local machine. It must be 8+ characters.
+
+services:
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk-home-lab
+    hostname: splunk-lab
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=changeme123!
+      - SPLUNK_LICENSE_URI=Free
+    ports:
+      - "8000:8000"   # Splunk Web
+      - "8089:8089"   # Management port (REST API)
+      - "9997:9997"   # Forwarder receiving port (optional, for future forwarders)
+    volumes:
+      - splunk-var:/opt/splunk/var
+      - splunk-etc:/opt/splunk/etc
+      - ./data:/opt/splunk/lab-data:ro
+      - ./config/props.conf:/opt/splunk/etc/system/local/props.conf:ro
+      - ./config/transforms.conf:/opt/splunk/etc/system/local/transforms.conf:ro
+    restart: unless-stopped
+
+volumes:
+  splunk-var:
+  splunk-etc:

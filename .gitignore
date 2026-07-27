@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Splunk runtime (if ever run outside Docker)
+splunk-var/
+splunk-etc/
+*.log.bak
