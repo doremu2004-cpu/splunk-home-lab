@@ -1,0 +1,15 @@
+`comment("Detection/Triage Aid: Top Talkers & Traffic Spike Overview")`
+`comment("Sourcetype: iptables_syslog, access_combined")`
+`comment("Logic: general-purpose triage search -- surfaces the busiest source IPs across firewall and web logs in the last 24h, useful as a starting point when investigating an alert or hunting for anomalies not caught by more specific searches")`
+
+index=security_lab (sourcetype=iptables_syslog OR sourcetype=access_combined)
+| eval event_type = case(sourcetype=="iptables_syslog", "firewall", sourcetype=="access_combined", "web")
+| stats count as event_count by src_ip, event_type
+| eventstats sum(event_count) as total_events by src_ip
+| sort - total_events
+| stats list(event_type) as sources, sum(event_count) as total_events by src_ip
+| sort - total_events
+| head 20
+
+`comment("Tuning: add `| eval baseline=avg(total_events)` with eventstats over a longer historical window, then flag src_ip values that are N standard deviations above baseline as an anomaly rather than eyeballing the table.")`
+`comment("Usage: run this first when triaging an alert to quickly see whether the source IP in question is a one-off or part of a broader spike.")`

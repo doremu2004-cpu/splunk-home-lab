@@ -1,0 +1,15 @@
+`comment("Detection: SSH Brute-Force Attempt")`
+`comment("Sourcetype: linux_secure")`
+`comment("Logic: flags any source IP with 5+ failed logins within a 5-minute window")`
+`comment("Expected hit in sample data: 203.0.113.45 -> 14 failed attempts against admin")`
+
+index=security_lab sourcetype=linux_secure action=Failed
+| bucket _time span=5m
+| stats count as failed_attempts, values(user) as attempted_users, dc(user) as distinct_users by src_ip, _time
+| where failed_attempts >= 5
+| sort - failed_attempts
+| table _time src_ip failed_attempts distinct_users attempted_users
+
+`comment("Tuning: lower span to 1m for stricter detection, or raise to 15m to catch slow/low-and-slow brute forcing.")`
+`comment("Tuning: raise failed_attempts threshold on noisy internet-facing hosts.")`
+`comment("Tuning: add NOT src_ip=10.0.0.0/24 to exclude trusted internal ranges.")`

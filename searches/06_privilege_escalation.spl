@@ -1,0 +1,13 @@
+`comment("Detection: Privilege Escalation / New Admin Account Creation")`
+`comment("Sourcetype: linux_secure")`
+`comment("Logic: flags sudo commands that create users, modify group membership, or otherwise grant elevated privileges -- especially from accounts that don't normally perform admin actions")`
+`comment("Expected hit in sample data: admin using useradd/usermod to create + elevate svc_backup immediately after the brute-force login")`
+
+index=security_lab sourcetype=linux_secure sudo_user=* command=*
+| rex field=command "(?i)(?<priv_action>useradd|usermod\s+-aG\s+sudo|groupadd|passwd|visudo|chmod\s+u\+s|adduser)"
+| where isnotnull(priv_action)
+| table _time sudo_user target_user command priv_action
+| sort - _time
+
+`comment("Tuning: build a lookup of 'known admin accounts' and filter to `NOT sudo_user IN (known_admins)` so only unexpected actors trigger the alert.")`
+`comment("Tuning: raise severity automatically if this fires within 15 minutes of a successful login that itself followed failed-login activity (see 02_successful_login_after_failures.spl) -- this chains recon -> access -> escalation into one incident.")`

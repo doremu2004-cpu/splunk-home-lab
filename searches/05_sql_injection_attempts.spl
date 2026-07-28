@@ -1,0 +1,15 @@
+`comment("Detection: SQL Injection Probing")`
+`comment("Sourcetype: access_combined")`
+`comment("Logic: flags web requests whose URI contains common SQLi signatures (quotes, UNION SELECT, OR 1=1, comment terminators, DROP/DELETE statements)")`
+`comment("Expected hit in sample data: 185.220.101.7 hitting /search.php and /login.php with encoded SQLi payloads")`
+
+index=security_lab sourcetype=access_combined
+| rex field=uri_path "(?i)(?<sqli_indicator>union(\s|%20)+select|or(\s|%20)+1(\s|%20)*=(\s|%20)*1|drop(\s|%20)+table|--(\s|%20)|;--|%27|'\s*or\s*'|;.*drop)"
+| where isnotnull(sqli_indicator)
+| stats count as attempt_count, values(uri_path) as payloads, values(status) as response_codes by src_ip, user_agent
+| sort - attempt_count
+| table src_ip user_agent attempt_count response_codes payloads
+
+`comment("Tuning: extend the regex to cover additional payload families (XSS, path traversal, command injection) for a broader 'web attack' detection.")`
+`comment("Tuning: correlate response_codes -- repeated 500s from the same source strongly suggest the payloads are actually reaching the DB layer and erroring, not just being blocked.")`
+`comment("Extension idea: pair with the suspicious_agent field tagged in transforms.conf to prioritize automated/tooling traffic (curl, python-requests, sqlmap, etc.) over browser traffic.")`

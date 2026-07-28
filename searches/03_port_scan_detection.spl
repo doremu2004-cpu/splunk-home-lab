@@ -1,0 +1,15 @@
+`comment("Detection: Port Scan")`
+`comment("Sourcetype: iptables_syslog")`
+`comment("Logic: flags a single source IP touching many distinct destination ports on one host in a short window -- classic recon/scanning behavior")`
+`comment("Expected hit in sample data: 198.51.100.23 -> 15 distinct ports against 10.0.0.7 within 15 seconds")`
+
+index=security_lab sourcetype=iptables_syslog
+| bucket _time span=1m
+| stats dc(dst_port) as distinct_ports_hit, values(dst_port) as ports_hit, count as total_packets by src_ip, dst_ip, _time
+| where distinct_ports_hit >= 10
+| sort - distinct_ports_hit
+| table _time src_ip dst_ip distinct_ports_hit total_packets ports_hit
+
+`comment("Tuning: lower distinct_ports_hit threshold (e.g. 5) to catch slower/stealthier scans, at the cost of more false positives from things like health-check probes.")`
+`comment("Tuning: swap span=1m for span=10s if your scanner traffic is extremely fast, as in the sample data.")`
+`comment("Extension idea: join with a threat-intel lookup on src_ip to auto-enrich with reputation data.")`

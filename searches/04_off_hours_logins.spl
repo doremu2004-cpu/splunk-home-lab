@@ -1,0 +1,13 @@
+`comment("Detection: Off-Hours / Unusual-Time Login")`
+`comment("Sourcetype: linux_secure")`
+`comment("Logic: flags successful logins outside standard business hours (08:00-19:00). Adjust the hour range to match your real operating hours / timezone.")`
+`comment("Expected hit in sample data: admin login at 22:59:30 (outside business hours) plus several late-night/early-morning legitimate ops logins worth reviewing")`
+
+index=security_lab sourcetype=linux_secure action=Accepted
+| eval login_hour = strftime(_time, "%H")
+| where login_hour < 8 OR login_hour >= 19
+| table _time user src_ip login_hour
+| sort - _time
+
+`comment("Tuning: replace the static hour window with a per-user baseline using eventstats avg/stdev of historic login hour, then flag deviations > 2 stdev for a more adaptive detection.")`
+`comment("Tuning: exclude known night-shift / on-call accounts via a lookup table to cut down noise.")`

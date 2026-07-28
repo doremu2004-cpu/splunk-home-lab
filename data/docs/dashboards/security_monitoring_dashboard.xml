@@ -1,0 +1,131 @@
+<form version="1.1" theme="dark">
+  <label>Security Monitoring - Home Lab</label>
+  <description>Log monitoring and alert detection dashboard: SSH auth, firewall, and web access sources</description>
+
+  <fieldset submitText="Apply" autoRun="true">
+    <input type="time" token="time_tok">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <single>
+        <title>Total Failed Logins (24h)</title>
+        <search>
+          <query>index=security_lab sourcetype=linux_secure action=Failed | stats count</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[10,25]</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Blocked Firewall Connections (24h)</title>
+        <search>
+          <query>index=security_lab sourcetype=iptables_syslog fw_action=DROP | stats count</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[10,20]</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>SQLi Attempts (24h)</title>
+        <search>
+          <query>index=security_lab sourcetype=access_combined | rex field=uri_path "(?i)(?<sqli_indicator>union(\s|%20)+select|or(\s|%20)+1(\s|%20)*=(\s|%20)*1|drop(\s|%20)+table|--(\s|%20)|;--|%27)" | where isnotnull(sqli_indicator) | stats count</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[1]</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Failed vs Successful SSH Logins Over Time</title>
+        <search>
+          <query>index=security_lab sourcetype=linux_secure | timechart span=1h count by action</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleY.text">Event Count</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Top Attacking Source IPs (Failed SSH Logins)</title>
+        <search>
+          <query>index=security_lab sourcetype=linux_secure action=Failed | stats count as failed_attempts, dc(user) as distinct_users_tried by src_ip | sort - failed_attempts | head 10</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Port Scan Activity</title>
+        <search>
+          <query>index=security_lab sourcetype=iptables_syslog | bucket _time span=1m | stats dc(dst_port) as distinct_ports_hit, values(dst_port) as ports_hit by src_ip, dst_ip, _time | where distinct_ports_hit >= 10 | sort - distinct_ports_hit</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>SQL Injection Attempts Over Time</title>
+        <search>
+          <query>index=security_lab sourcetype=access_combined | rex field=uri_path "(?i)(?<sqli_indicator>union(\s|%20)+select|or(\s|%20)+1(\s|%20)*=(\s|%20)*1|drop(\s|%20)+table|--(\s|%20)|;--|%27)" | where isnotnull(sqli_indicator) | timechart span=1h count</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Off-Hours Successful Logins</title>
+        <search>
+          <query>index=security_lab sourcetype=linux_secure action=Accepted | eval login_hour = strftime(_time, "%H") | where login_hour < 8 OR login_hour >= 19 | table _time user src_ip login_hour | sort - _time</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Privilege Escalation Events</title>
+        <search>
+          <query>index=security_lab sourcetype=linux_secure sudo_user=* command=* | rex field=command "(?i)(?<priv_action>useradd|usermod\s+-aG\s+sudo|groupadd|passwd|visudo|adduser)" | where isnotnull(priv_action) | table _time sudo_user target_user command | sort - _time</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+</form>

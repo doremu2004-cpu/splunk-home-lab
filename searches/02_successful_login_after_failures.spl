@@ -1,0 +1,15 @@
+`comment("Detection: Successful Login Immediately Following a Burst of Failures")`
+`comment("Sourcetype: linux_secure")`
+`comment("Logic: correlates a run of failed logins with a subsequent success from the SAME source IP within 10 minutes -- a strong indicator of a successful brute-force compromise")`
+`comment("Expected hit in sample data: 203.0.113.45 -> 14 failures then Accepted for admin at 22:59:30")`
+
+index=security_lab sourcetype=linux_secure (action=Failed OR action=Accepted)
+| transaction src_ip maxspan=10m startswith=eval(action=="Failed") endswith=eval(action=="Accepted")
+| eval failed_count = mvcount(mvfilter(match(action, "Failed")))
+| where failed_count >= 3
+| table _time src_ip user failed_count duration
+| rename duration as seconds_from_first_failure_to_success
+| sort - failed_count
+
+`comment("Tuning: raise failed_count threshold to reduce false positives from legitimate users who mistype a password a couple times before succeeding.")`
+`comment("Tuning: this pattern (recon -> access) pairs well with 03_port_scan_detection.spl for building an attack-chain correlation search.")`
